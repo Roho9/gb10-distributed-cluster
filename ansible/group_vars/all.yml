@@ -1,0 +1,22 @@
+---
+# Cluster-wide variables. Per-node values (fabric_ip, fabric_iface, rdma_dev) live in
+# the inventory. These are the settings shared by every node.
+
+# --- Fabric ---
+fabric_subnet_cidr: "192.168.100.0/24"
+fabric_mtu: 9000
+
+# --- RoCE ---
+roce_priority: 3            # PFC priority carrying RoCE traffic
+roce_dscp: 26               # DSCP value mapped to that priority (26 -> prio 3)
+# traffic_class = dscp << 2  (computed in the role); NCCL_IB_TC uses the same value
+
+# --- NCCL ---
+# Confirm nccl_ib_gid_index per node with show_gids (the RoCEv2 IPv4 GID index).
+# It is commonly 3 on ConnectX-7 but verify; a wrong value breaks or slows NCCL.
+nccl_ib_gid_index: 3
+nccl_net_gdr_level: "PXB"   # allow GPUDirect RDMA (NIC DMAs GPU memory directly)
+nccl_qps_per_connection: 4  # more queue pairs to saturate the dual PCIe Gen5 x4 path
+nccl_debug: "WARN"          # steady-state; set INFO during first bring-up
+
+# Rendered to /etc/nccl.conf on every node by the nccl role.

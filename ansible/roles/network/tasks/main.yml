@@ -1,0 +1,32 @@
+---
+# network role: static fabric IP, jumbo MTU, and /etc/hosts fabric names.
+
+- name: Render netplan for the CX7 fabric interface
+  ansible.builtin.copy:
+    dest: /etc/netplan/60-fabric.yaml
+    mode: "0600"
+    content: |
+      network:
+        version: 2
+        renderer: networkd
+        ethernets:
+          {{ fabric_iface }}:
+            dhcp4: no
+            dhcp6: no
+            addresses:
+              - {{ fabric_ip }}/{{ fabric_subnet_cidr.split('/')[1] }}
+            mtu: {{ fabric_mtu }}
+  notify: apply netplan
+
+- name: Ensure the fabric interface is up now with the right MTU (live, pre-reboot)
+  ansible.builtin.command: "ip link set {{ fabric_iface }} mtu {{ fabric_mtu }} up"
+  changed_when: false
+
+- name: Populate /etc/hosts with fabric names for every node
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} GB10 FABRIC HOSTS (managed by ansible)"
+    block: |
+      {% for h in groups['gb10'] %}
+      {{ hostvars[h].fabric_ip }}  {{ h }}
+      {% endfor %}

@@ -1,0 +1,65 @@
+---
+# roce role: RoCE v2, PFC on the RoCE priority, DSCP traffic class, ECN.
+# Defensive: knobs that vary by OFED/DOCA version are attempted and failures are
+# reported but do not abort the play, matching scripts/configure-roce.sh.
+
+- name: Compute RoCE traffic class (dscp << 2)
+  ansible.builtin.set_fact:
+    roce_tc: "{{ roce_dscp | int * 4 }}"
+
+- name: Set RoCE mode v2 on port 1
+  ansible.builtin.command: "cma_roce_mode -d {{ rdma_dev }} -p 1 -m 2"
+  register: roce_mode
+  changed_when: "'RoCE v2' in roce_mode.stdout or roce_mode.rc == 0"
+  failed_when: false
+
+- name: Build PFC mask with a 1 at the RoCE priority (e.g. 0,0,0,1,0,0,0,0)
+  # Three passes avoid a digit collision: priority digit -> X, remaining digits -> 0,
+  # then X -> 1. Correct for any priority 0..7 (verified for all eight values).
+  ansible.builtin.set_fact:
+    pfc_mask: >-
+      {{ range(8)
+         | map('regex_replace', '^' ~ (roce_priority | string) ~ '$', 'X')
+         | map('regex_replace', '^[0-9]$', '0')
+         | map('regex_replace', '^X$', '1')
+         | join(',') }}
+
+- name: Trust DSCP on the fabric interface
+  ansible.builtin.command: "mlnx_qos -i {{ fabric_iface }} --trust dscp"
+  register: trust_dscp
+  changed_when: false
+  failed_when: false
+
+- name: Enable PFC on the RoCE priority
+  ansible.builtin.command: "mlnx_qos -i {{ fabric_iface }} --pfc {{ pfc_mask }}"
+  register: pfc_set
+  changed_when: false
+  failed_when: false
+
+- name: Set the RDMA traffic class (best effort; path varies by version)
+  ansible.builtin.shell: >-
+    p=/sys/class/infiniband/{{ rdma_dev }}/tc/1/traffic_class;
+    if [ -w "$p" ]; then echo {{ roce_tc }} > "$p"; else echo "no-tc-path"; fi
+  register: tc_set
+  changed_when: "'no-tc-path' not in tc_set.stdout"
+  failed_when: false
+
+- name: Enable ECN/DCQCN on the RoCE priority (best effort)
+  ansible.builtin.shell: >-
+    base=/sys/class/net/{{ fabric_iface }}/ecn; set_any=0;
+    for role in roce_np roce_rp; do
+      f="$base/$role/enable/{{ roce_priority }}";
+      if [ -w "$f" ]; then echo 1 > "$f"; set_any=1; fi;
+    done;
+    [ "$set_any" = 1 ] && echo "ecn-enabled" || echo "no-ecn-path"
+  register: ecn_set
+  changed_when: "'ecn-enabled' in ecn_set.stdout"
+  failed_when: false
+
+- name: Report any RoCE knobs that could not be applied
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: roce_mode rc={{ roce_mode.rc }},
+      trust rc={{ trust_dscp.rc }}, pfc rc={{ pfc_set.rc }},
+      tc={{ tc_set.stdout }}, ecn={{ ecn_set.stdout }}.
+      If any show no-path/nonzero, apply that knob manually per docs/04-roce-tuning.md.

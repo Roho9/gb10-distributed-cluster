@@ -1,0 +1,30 @@
+# Local inventory and secrets
+ansible/inventory.ini
+ansible/group_vars/vault.yml
+*.retry
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Model weights and caches (never commit these)
+models/
+*.gguf
+*.safetensors
+*.bin
+.cache/
+huggingface/
+
+# Logs and validation output
+logs/
+*.log
+nccl-test-*.txt
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,27 @@
+---
+# nccl role: write /etc/nccl.conf so every process on the node inherits the RoCE
+# transport settings without each launcher having to re-specify them.
+
+- name: Write /etc/nccl.conf
+  ansible.builtin.copy:
+    dest: /etc/nccl.conf
+    mode: "0644"
+    content: |
+      # Managed by ansible (nccl role). See docs/04-roce-tuning.md.
+      NCCL_IB_HCA={{ rdma_dev }}
+      NCCL_IB_GID_INDEX={{ nccl_ib_gid_index }}
+      NCCL_SOCKET_IFNAME={{ fabric_iface }}
+      NCCL_NET_GDR_LEVEL={{ nccl_net_gdr_level }}
+      NCCL_IB_TC={{ roce_dscp | int * 4 }}
+      NCCL_IB_QPS_PER_CONNECTION={{ nccl_qps_per_connection }}
+      NCCL_IB_DISABLE=0
+      NCCL_DEBUG={{ nccl_debug }}
+
+- name: Confirm nccl.conf contents
+  ansible.builtin.command: cat /etc/nccl.conf
+  register: nccl_conf
+  changed_when: false
+
+- name: Show nccl.conf
+  ansible.builtin.debug:
+    var: nccl_conf.stdout_lines

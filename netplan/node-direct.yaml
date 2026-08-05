@@ -1,0 +1,19 @@
+# Example netplan for a node in the 2-node direct-connect topology.
+# Copy to /etc/netplan/60-fabric.yaml on the node and adjust:
+#   - the interface name (enp1s0f0np0) to this node's CX7 netdev (ibdev2netdev)
+#   - the address to this node's fabric IP
+# Apply with: sudo netplan apply
+#
+# The CX7 fabric interface has a static IP, MTU 9000, and NO gateway.
+# The management interface (not shown) keeps DHCP and the default route.
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp1s0f0np0:            # <-- CX7 fabric netdev for THIS node (confirm with ibdev2netdev)
+      dhcp4: no
+      dhcp6: no
+      addresses:
+        - 192.168.100.11/24 # <-- THIS node's fabric IP (11 on gb10-01, 12 on gb10-02)
+      mtu: 9000
+      # no gateway4 and no nameservers: fabric is a closed, non-routed subnet

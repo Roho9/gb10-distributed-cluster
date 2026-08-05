@@ -1,0 +1,37 @@
+---
+# Bring the whole cluster to a validated, ready-to-run state.
+# Ansible connects over the MANAGEMENT network (ansible_host in the inventory) and
+# configures the CX7 fabric on each node.
+#
+#   ansible-playbook -i inventory.ini site.yml
+#
+# Roles run in order: network (IP/MTU/hosts) -> roce (RoCE v2/PFC/ECN) -> nccl (/etc/nccl.conf)
+
+- name: Configure GB10 distributed cluster fabric
+  hosts: gb10
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Ensure required per-node inventory vars are set
+      ansible.builtin.assert:
+        that:
+          - fabric_ip is defined
+          - fabric_iface is defined
+          - rdma_dev is defined
+        fail_msg: >-
+          Each host needs fabric_ip, fabric_iface, and rdma_dev in the inventory.
+          See inventory.example.ini and docs/03-network-design.md.
+
+  roles:
+    - network
+    - roce
+    - nccl
+
+  post_tasks:
+    - name: Reminder to validate
+      ansible.builtin.debug:
+        msg: >-
+          Fabric configured on {{ inventory_hostname }}. From your control host run
+          ./scripts/validate-fabric.sh and ./scripts/run-nccl-test.sh to confirm
+          bandwidth before launching workloads.

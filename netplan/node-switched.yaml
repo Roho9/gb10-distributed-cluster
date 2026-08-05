@@ -1,0 +1,15 @@
+# Example netplan for a node in the N-node switched-fabric topology.
+# Identical in shape to the direct-connect case: the switch is transparent at L3
+# because it only bridges. Copy to /etc/netplan/60-fabric.yaml and adjust the
+# interface name and the address per node. Apply with: sudo netplan apply
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp1s0f0np0:            # <-- CX7 fabric netdev for THIS node (confirm with ibdev2netdev)
+      dhcp4: no
+      dhcp6: no
+      addresses:
+        - 192.168.100.13/24 # <-- THIS node's fabric IP (unique per node)
+      mtu: 9000
+      # no gateway4, no nameservers: management interface carries the default route
