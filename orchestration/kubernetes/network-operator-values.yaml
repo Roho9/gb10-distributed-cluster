@@ -1,0 +1,32 @@
+# Helm values for the NVIDIA Network Operator on the GB10 cluster.
+# Install, for example:
+#   helm install network-operator nvidia/network-operator -n nvidia-network-operator \
+#     --create-namespace -f network-operator-values.yaml
+#
+# This enables the RDMA shared device plugin (so pods can request rdma/rdma_shared_device_a)
+# and a macvlan secondary network on the ConnectX-7 so pods get an address on the fabric
+# subnet (192.168.100.0/24). Adjust the master interface name to your CX7 netdev.
+---
+nfd:
+  enabled: true
+
+sriovNetworkOperator:
+  enabled: false        # GB10 CX7 is used via RDMA shared device + macvlan, not SR-IOV here
+
+rdmaSharedDevicePlugin:
+  deploy: true
+  resources:
+    - name: rdma_shared_device_a
+      ifNames: [enp1s0f0np0]     # <-- CX7 fabric netdev on the nodes (confirm with ibdev2netdev)
+
+secondaryNetwork:
+  deploy: true
+  cniPlugins:
+    deploy: true
+  multus:
+    deploy: true
+  ipamPlugin:
+    deploy: true
+
+# The macvlan NetworkAttachmentDefinition itself is applied separately (below) once the
+# operator is up. Pods reference it via the k8s.v1.cni.cncf.io/networks annotation.

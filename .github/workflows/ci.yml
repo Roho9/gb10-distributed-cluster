@@ -1,0 +1,87 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Lint shell scripts
+        run: |
+          # All executable/.sh scripts. sbatch files are bash with SBATCH comments.
+          files=$(find scripts observability orchestration benchmarks workloads -type f \
+            \( -name '*.sh' -o -name '*.sbatch' \))
+          echo "linting:"; echo "$files"
+          # Fail on error-level findings (real bugs). Style/info nags (quoting preferences,
+          # intentional word-splitting of host lists) are not build-breaking here.
+          # SC1091: do not follow sourced files that only exist on the nodes (/etc/nccl.conf).
+          # shellcheck reads .shellcheckrc for the shared directives.
+          shellcheck --severity=error -e SC1091 $files
+
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pipx install yamllint
+      - name: Lint YAML
+        run: yamllint -c .yamllint .
+
+  ansible-lint:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ansible-lint
+        run: pip install ansible-lint
+      - name: Lint the Ansible project
+        run: ansible-lint ansible/ || true   # advisory: style findings should not block
+
+  python-tests:
+    name: python-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test deps
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        run: pytest -q
+
+  markdown-links:
+    name: markdown-link-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check relative links in docs
+        run: |
+          python3 - <<'PY'
+          import re, pathlib, sys
+          root = pathlib.Path('.')
+          broken = []
+          for md in root.rglob('*.md'):
+              text = md.read_text(encoding='utf-8')
+              for m in re.finditer(r'\]\(([^)]+)\)', text):
+                  target = m.group(1).split('#')[0].strip()
+                  if not target or target.startswith(('http://', 'https://', 'mailto:')):
+                      continue
+                  if not (md.parent / target).resolve().exists():
+                      broken.append(f"{md}: {target}")
+          if broken:
+              print("broken relative links:"); print("\n".join(broken)); sys.exit(1)
+          print("all relative markdown links resolve")
+          PY

@@ -1,0 +1,110 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "Prometheus data source scraping the GB10 cluster",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "title": "GB10 Cluster Fabric and GPU",
+  "tags": ["gb10", "roce", "nccl"],
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "node",
+        "label": "Node",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(roce_port_rcv_bytes_total, instance)",
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Fabric throughput (rx + tx) per node",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(roce_port_rcv_bytes_total{instance=~\"$node\"}[1m]) * 8", "legendFormat": "{{instance}} rx" },
+        { "refId": "B", "expr": "rate(roce_port_xmit_bytes_total{instance=~\"$node\"}[1m]) * 8", "legendFormat": "{{instance}} tx" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "PFC pause frames per second (priority 3)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "description": "Sustained high PFC pause means congestion; ECN should be backing senders off before this dominates.",
+      "fieldConfig": { "defaults": { "unit": "pps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(node_network_pause_prio3_total{instance=~\"$node\"}[1m])", "legendFormat": "{{instance}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "RoCE ECN-marked packets per second",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "description": "ECN marks rising under load is healthy: senders are being told to slow down before drops.",
+      "fieldConfig": { "defaults": { "unit": "pps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(roce_np_ecn_marked_roce_packets_total{instance=~\"$node\"}[1m])", "legendFormat": "{{instance}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "RoCE errors and retransmits per second",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "description": "Any sustained nonzero value here means the fabric is not lossless. Check PFC/ECN/MTU.",
+      "fieldConfig": { "defaults": { "unit": "pps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(roce_port_rcv_errors_total{instance=~\"$node\"}[1m])", "legendFormat": "{{instance}} rcv_err" },
+        { "refId": "B", "expr": "rate(roce_out_of_sequence_total{instance=~\"$node\"}[1m])", "legendFormat": "{{instance}} out_of_seq" },
+        { "refId": "C", "expr": "rate(roce_packet_seq_err_total{instance=~\"$node\"}[1m])", "legendFormat": "{{instance}} seq_err" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "GPU utilization per node",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 18 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "DCGM_FI_DEV_GPU_UTIL{instance=~\"$node\"}", "legendFormat": "{{instance}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Pooled GPU memory used across cluster",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 18 },
+      "description": "Sum of GPU memory used across nodes: the pooled-VRAM view.",
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(DCGM_FI_DEV_FB_USED)", "legendFormat": "cluster total" },
+        { "refId": "B", "expr": "DCGM_FI_DEV_FB_USED{instance=~\"$node\"}", "legendFormat": "{{instance}}" }
+      ]
+    }
+  ]
+}

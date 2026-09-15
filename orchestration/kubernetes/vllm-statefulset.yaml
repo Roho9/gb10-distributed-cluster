@@ -1,0 +1,88 @@
+# Multi-node vLLM on Kubernetes via a Ray cluster (head + workers) as a StatefulSet.
+# The head pod (ordinal 0) starts Ray and the vLLM server with pipeline-parallel size equal
+# to the replica count; the other pods join Ray as workers. Requires the NVIDIA GPU +
+# Network Operators. Apply: kubectl apply -f vllm-statefulset.yaml
+#
+# This is a template: set the image, MODEL, and replica count to your model and cluster.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gb10-vllm
+  labels:
+    app: gb10-vllm
+spec:
+  clusterIP: None            # headless, for stable per-pod DNS (gb10-vllm-0, gb10-vllm-1, ...)
+  selector:
+    app: gb10-vllm
+  ports:
+    - name: http
+      port: 8000
+    - name: ray
+      port: 6379
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gb10-vllm
+spec:
+  serviceName: gb10-vllm
+  replicas: 2                # = pipeline-parallel size (one GB10 GPU per replica)
+  selector:
+    matchLabels:
+      app: gb10-vllm
+  template:
+    metadata:
+      labels:
+        app: gb10-vllm
+      annotations:
+        k8s.v1.cni.cncf.io/networks: gb10-fabric-macvlan   # CX7 fabric network -> net1
+    spec:
+      containers:
+        - name: vllm
+          image: <registry>/vllm-gb10:latest
+          securityContext:
+            capabilities:
+              add: ["IPC_LOCK"]
+          env:
+            - name: MODEL
+              value: "meta-llama/Llama-3.1-70B-Instruct"
+            - name: PP_SIZE
+              value: "2"
+            - name: NCCL_IB_HCA
+              value: "mlx5_0"
+            - name: NCCL_SOCKET_IFNAME
+              value: "net1"
+            - name: NCCL_IB_GID_INDEX
+              value: "3"
+            - name: POD_ORDINAL
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              HEAD=gb10-vllm-0.gb10-vllm
+              if [ "${POD_ORDINAL}" = "0" ]; then
+                ray start --head --port=6379 --node-ip-address="$(hostname -i)"
+                sleep 10
+                exec vllm serve "$MODEL" \
+                  --distributed-executor-backend ray \
+                  --pipeline-parallel-size "$PP_SIZE" \
+                  --tensor-parallel-size 1 \
+                  --host 0.0.0.0 --port 8000
+              else
+                sleep 15
+                exec ray start --address="${HEAD}:6379" \
+                  --node-ip-address="$(hostname -i)" --block
+              fi
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+              rdma/rdma_shared_device_a: 1
+            requests:
+              nvidia.com/gpu: 1
+              rdma/rdma_shared_device_a: 1

@@ -1,0 +1,28 @@
+# Prometheus scrape config for the GB10 cluster.
+# Replace the node targets with your fabric or management IPs/hostnames.
+# node_exporter (with the RoCE textfile collector) provides fabric + host metrics;
+# dcgm-exporter provides GPU metrics.
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: node
+    static_configs:
+      - targets:
+          - gb10-01:9100
+          - gb10-02:9100
+          - gb10-03:9100
+          - gb10-04:9100
+        labels:
+          cluster: gb10
+
+  - job_name: dcgm
+    static_configs:
+      - targets:
+          - gb10-01:9400
+          - gb10-02:9400
+          - gb10-03:9400
+          - gb10-04:9400
+        labels:
+          cluster: gb10

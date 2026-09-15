@@ -1,0 +1,31 @@
+# Example slurm.conf for a rack of GB10 nodes. Copy to /etc/slurm/slurm.conf on every node
+# and the controller, and edit the names/hosts marked below. This is a minimal, single-rack
+# configuration, not a hardened multi-tenant setup.
+ClusterName=gb10
+SlurmctldHost=gb10-ctl        # <-- controller hostname (can be a management node)
+
+# --- scheduling ---
+SchedulerType=sched/backfill
+SelectType=select/cons_tres
+SelectTypeParameters=CR_Core_Memory
+GresTypes=gpu
+
+# --- process tracking / MPI ---
+ProctrackType=proctrack/cgroup
+TaskPlugin=task/cgroup,task/affinity
+MpiDefault=pmix
+
+# --- accounting (optional; simple here) ---
+JobAcctGatherType=jobacct_gather/cgroup
+SlurmctldPidFile=/run/slurmctld.pid
+SlurmdPidFile=/run/slurmd.pid
+StateSaveLocation=/var/spool/slurmctld
+SlurmdSpoolDir=/var/spool/slurmd
+SlurmUser=slurm
+
+# --- nodes: one Blackwell GPU each; adjust CPUs/RealMemory to your unit ---
+# Use the FABRIC hostnames so Slurm-launched ranks resolve peers over the CX7 network.
+NodeName=gb10-[01-16] Gres=gpu:1 CPUs=20 RealMemory=120000 State=UNKNOWN
+
+# --- partitions ---
+PartitionName=fabric Nodes=gb10-[01-16] Default=YES MaxTime=INFINITE State=UP

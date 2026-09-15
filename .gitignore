@@ -23,6 +23,11 @@ logs/
 *.log
 nccl-test-*.txt
 
+# Benchmark output (results are machine-specific; commit deliberately if at all)
+results/
+benchmarks/results/
+*.png
+
 # Editor / OS
 .DS_Store
 .idea/

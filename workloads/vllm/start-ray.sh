@@ -19,7 +19,7 @@ if [[ -z "$MY_FABRIC_IP" ]]; then
 fi
 
 # Inherit NCCL RoCE env for any actor started by Ray.
-[[ -f /etc/nccl.conf ]] && export $(grep -v '^#' /etc/nccl.conf | xargs)
+[[ -f /etc/nccl.conf ]] && { set -a; . /etc/nccl.conf; set +a; }
 export GLOO_SOCKET_IFNAME="${NCCL_SOCKET_IFNAME:-enp1s0f0np0}"
 
 case "$ROLE" in

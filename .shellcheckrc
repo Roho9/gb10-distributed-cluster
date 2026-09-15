@@ -1,0 +1,6 @@
+# Shared shellcheck directives for local runs and CI.
+# Scripts are bash.
+shell=bash
+# /etc/nccl.conf is created on the nodes by the ansible nccl role; it does not exist in the
+# repo, so shellcheck cannot follow it. This is expected, not a defect.
+disable=SC1091

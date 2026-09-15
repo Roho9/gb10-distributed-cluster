@@ -1,0 +1,67 @@
+# MPIJob that runs NCCL all_reduce_perf across GB10 worker pods over the RoCE fabric.
+# Requires the Kubeflow MPI Operator and the NVIDIA GPU + Network Operators.
+# Apply: kubectl apply -f nccl-test-mpijob.yaml
+#
+# Replace <registry>/nccl-tests:cuda with an image that has CUDA, OpenMPI, and nccl-tests
+# built for aarch64. Attach the CX7 macvlan network so pods sit on the fabric subnet.
+---
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: gb10-nccl-test
+spec:
+  slotsPerWorker: 1
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        spec:
+          containers:
+            - name: launcher
+              image: <registry>/nccl-tests:cuda
+              command: ["mpirun"]
+              args:
+                - "--allow-run-as-root"
+                - "-np"
+                - "4"
+                - "-bind-to"
+                - "none"
+                - "-x"
+                - "NCCL_DEBUG=INFO"
+                - "-x"
+                - "NCCL_IB_HCA=mlx5_0"
+                - "-x"
+                - "NCCL_SOCKET_IFNAME=net1"
+                - "-x"
+                - "NCCL_IB_GID_INDEX=3"
+                - "/opt/nccl-tests/build/all_reduce_perf"
+                - "-b"
+                - "8"
+                - "-e"
+                - "8G"
+                - "-f"
+                - "2"
+                - "-g"
+                - "1"
+    Worker:
+      replicas: 4
+      template:
+        metadata:
+          annotations:
+            k8s.v1.cni.cncf.io/networks: gb10-fabric-macvlan   # CX7 secondary net -> net1 in pod
+        spec:
+          containers:
+            - name: worker
+              image: <registry>/nccl-tests:cuda
+              securityContext:
+                capabilities:
+                  add: ["IPC_LOCK"]        # required for RDMA memory pinning
+              resources:
+                limits:
+                  nvidia.com/gpu: 1
+                  rdma/rdma_shared_device_a: 1
+                requests:
+                  nvidia.com/gpu: 1
+                  rdma/rdma_shared_device_a: 1

@@ -91,14 +91,39 @@ See `docs/02-hardware-bom.md` for the full list including switches and cables.
 ## Repository layout
 
 ```
-docs/         Architecture, BOM, network design, RoCE tuning, cabling, operations
-topology/     Wiring diagrams for the 2-node and N-node cases
-ansible/      Playbook + roles: network, roce, nccl
-scripts/      Standalone configuration and validation scripts
-switch/       Switch bridge / L2 domain configuration
-workloads/    vLLM, llama.cpp RPC, and PyTorch DDP pooled-VRAM examples
-netplan/      Example netplan configs for direct and switched topologies
+docs/           Architecture, BOM, network design, RoCE tuning, cabling, operations, rack-scale
+topology/       Wiring diagrams for the 2-node and N-node cases
+ansible/        Playbook + roles: network, roce, nccl
+scripts/        Standalone configuration and validation scripts
+switch/         Switch bridge / L2 domain configuration
+workloads/      vLLM, llama.cpp RPC, and PyTorch DDP pooled-VRAM examples
+netplan/        Example netplan configs for direct, switched, and bonded topologies
+observability/  Live fabric counters, Prometheus RoCE collector, Grafana dashboard
+orchestration/  Slurm and Kubernetes job submission over the fabric
+benchmarks/     NCCL scaling sweep, train/serve benches, results aggregator + chart
+tests/          pytest suite (pfc_mask, config invariants); CI in .github/workflows
 ```
+
+## Scaling to a rack (8 to 16 nodes)
+
+The 2-node and small-N designs scale straight to a single rack on one RoCE switch.
+`docs/07-rack-scale.md` covers port planning, using both ConnectX-7 ports in an LACP bond
+(`netplan/node-bonded.yaml`), rank placement, and the deeper PFC/ECN/DCQCN tuning that
+matters once many nodes share switch buffers. Multi-rack leaf-spine (routed RoCE) is
+deliberately out of scope.
+
+## Observability, orchestration, benchmarks, tests
+
+- **Observability** (`observability/`): `fabric-watch.sh` prints live RDMA/PFC/ECN counters
+  during a job; a Prometheus RoCE textfile collector plus a Grafana dashboard give the
+  continuous view. The failure mode at scale is silent throughput collapse from PFC/ECN, and
+  these make it visible.
+- **Orchestration** (`orchestration/`): submit jobs instead of hand-launching per node.
+  Slurm (`sbatch` for DDP and vLLM) or Kubernetes (RDMA device plugin + multi-node manifests).
+- **Benchmarks** (`benchmarks/`): `nccl-sweep.sh` measures collective bandwidth as node count
+  grows; `aggregate.py` emits a table and a scaling chart. Plus train and serve benches.
+- **Tests / CI** (`tests/`, `.github/workflows/ci.yml`): pytest for the trickiest templating
+  and config invariants, plus shellcheck, yamllint, ansible-lint, and a markdown link check.
 
 ## Scope and honesty note
 

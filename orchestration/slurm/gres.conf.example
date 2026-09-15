@@ -1,0 +1,6 @@
+# Example gres.conf: declare the single Blackwell GPU per GB10 node as a GRES.
+# Copy to /etc/slurm/gres.conf on every node. If your device node differs, adjust File=.
+# AutoDetect=nvml lets Slurm discover the GPU via NVML instead of a hardcoded device path;
+# prefer it when the NVIDIA driver/NVML is present (it is on the DGX stack).
+AutoDetect=nvml
+Name=gpu Type=gb10 File=/dev/nvidia0

@@ -14,6 +14,10 @@ help:
 	@echo "  make validate        Check link state and RDMA bandwidth across the fabric"
 	@echo "  make run-nccl-test   Run NCCL all_reduce_perf across HOSTS"
 	@echo "  make health          One-shot health check on the local node"
+	@echo "  make watch           Live RDMA/PFC/ECN counters on the local node"
+	@echo "  make nccl-sweep      Sweep NCCL busbw across node counts into a CSV"
+	@echo "  make chart           Aggregate the sweep CSV into a table + scaling chart"
+	@echo "  make test            Run the pytest suite"
 	@echo "  make serve-vllm      Launch vLLM tensor/pipeline-parallel serving"
 	@echo "  make llama-rpc       Launch llama.cpp RPC pooled-memory inference"
 	@echo "  make train-ddp       Launch the PyTorch DDP training example"
@@ -33,6 +37,22 @@ run-nccl-test:
 .PHONY: health
 health:
 	./scripts/health-check.sh
+
+.PHONY: watch
+watch:
+	./observability/fabric-watch.sh
+
+.PHONY: nccl-sweep
+nccl-sweep:
+	./benchmarks/nccl-sweep.sh $(HOSTS) results/nccl-sweep.csv
+
+.PHONY: chart
+chart:
+	python3 benchmarks/aggregate.py results/nccl-sweep.csv --out results/nccl-scaling.png
+
+.PHONY: test
+test:
+	pytest -q
 
 .PHONY: serve-vllm
 serve-vllm:

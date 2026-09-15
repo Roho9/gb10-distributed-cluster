@@ -1,0 +1,30 @@
+# Example netplan for a node that bonds BOTH ConnectX-7 ports into one LACP fabric
+# link (rack-scale option, see docs/07-rack-scale.md). Copy to /etc/netplan/60-fabric.yaml,
+# adjust the two member interface names and the address, and apply with: sudo netplan apply
+#
+# The switch side must have a matching LACP LAG for this node's two ports, in the fabric
+# bridge, at MTU 9000 with PFC priority 3.
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp1s0f0np0:            # <-- CX7 port 0 netdev (confirm with ibdev2netdev)
+      dhcp4: no
+      dhcp6: no
+      mtu: 9000
+    enp1s0f1np1:            # <-- CX7 port 1 netdev (confirm with ibdev2netdev)
+      dhcp4: no
+      dhcp6: no
+      mtu: 9000
+  bonds:
+    bond-fabric:
+      interfaces: [enp1s0f0np0, enp1s0f1np1]
+      addresses:
+        - 192.168.100.11/24 # <-- THIS node's fabric IP (unique per node)
+      mtu: 9000
+      parameters:
+        mode: 802.3ad          # LACP
+        lacp-rate: fast
+        transmit-hash-policy: layer3+4   # spread node-to-node flows across both members
+        mii-monitor-interval: 100
+      # no gateway4, no nameservers: fabric is a closed, non-routed subnet
