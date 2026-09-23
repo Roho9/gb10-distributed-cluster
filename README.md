@@ -1,5 +1,7 @@
 # GB10 Distributed Compute Cluster
 
+[![ci](https://github.com/Roho9/gb10-distributed-cluster/actions/workflows/ci.yml/badge.svg)](https://github.com/Roho9/gb10-distributed-cluster/actions/workflows/ci.yml)
+
 A complete reference architecture and deployment toolkit for building a distributed
 compute cluster from multiple NVIDIA GB10 (Grace Blackwell) systems, such as the
 NVIDIA DGX Spark. It covers routing, network switching, cabling, and the RoCE/NCCL
